@@ -72,7 +72,7 @@ def sample_feature_extraction(sampleGesture, fftTop, samplePeriod):
         
         max1 = freq1.argsort()[-(fftTop):][::-1]
         maxFreqs1 = []
-        if len(maxFreqs1) < fftTop:
+        if len(max1) < fftTop:
             maxFreqs1 = np.zeros(fftTop)
         else:
             for i in range(fftTop):
@@ -303,7 +303,7 @@ for user in intersection:
 NNMetricsTable = pd.DataFrame(data = NNMetricsTable, columns= ['user', 'accuracy', 'precision', 'recall', 'f1'])
 
 
-
+################ phase 2 on all data #############################################
 
 allUsersMetricsTable = []
 allUsersMetricsTable.append(get_tree_metrics(inputData, 'allusers'))
@@ -313,13 +313,13 @@ allUsersMetricsTable = pd.DataFrame(data = allUsersMetricsTable, columns= ['meth
 allUsersMetricsTable['method'] = ['Decision Tree', 'Support Vector Machine', 'Neural Network']
 
 
-# test1 = user_extracted_features('IMU', fftTop, ['user18', 'user25'], 100)
-# test2 = user_extracted_features('EMG', fftTop, ['user18', 'user25'], 100)
+test1 = user_extracted_features('IMU', fftTop, ['user18', 'user25'], 100)
+test2 = user_extracted_features('EMG', fftTop, ['user18', 'user25'], 100)
 
-# test1['label'].count
-# users1 = wholeIMUMatrix.groupby('user')['label'].agg('count')
+test1['label'].count
+users1 = wholeIMUMatrix.groupby('user')['label'].agg('count')
 
-# users2 = wholeEMGMatrix.groupby('user')['label'].agg('count')
+users2 = wholeEMGMatrix.groupby('user')['label'].agg('count')
 
 
 # user18IMU = wholeIMUMatrix.groupby('user').get_group('user18')
