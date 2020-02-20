@@ -245,7 +245,7 @@ def get_Phase2_Matrix(dataType, fftTop, rowAgg):
     spoonEMG = GetLabeledDataMatrix('groundTruth', 'user9', 'user09', 'spoon', dataType)
     global userDataMatrix 
     userDataMatrix = pd.DataFrame()
-    userDataMatrix = forkEMG.append(spoonEMG)
+    userDataMatrix = forkEMG.append(spoonEMG, ignore_index=True)
     #split matrix based on eating and not-eating
     eatingMatrix = eatingMatrix.append(userDataMatrix[userDataMatrix['label'] == 'eating'], ignore_index=True)
     nonEatingMatrix = nonEatingMatrix.append(userDataMatrix[userDataMatrix['label'] == 'not-eating'], ignore_index=True)
@@ -254,7 +254,7 @@ def get_Phase2_Matrix(dataType, fftTop, rowAgg):
         print(user)
         forkEMG = GetLabeledDataMatrix('groundTruth', user, user, 'fork', dataType)
         spoonEMG = GetLabeledDataMatrix('groundTruth', user, user, 'spoon', dataType)
-        userDataMatrix = forkEMG.append(spoonEMG)
+        userDataMatrix = forkEMG.append(spoonEMG, ignore_index=True)
         eatingMatrix = eatingMatrix.append(userDataMatrix[userDataMatrix['label'] == 'eating'], ignore_index=True)
         nonEatingMatrix = nonEatingMatrix.append(userDataMatrix[userDataMatrix['label'] == 'not-eating'], ignore_index=True)
     if rowAgg == -1:
