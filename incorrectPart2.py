@@ -143,33 +143,103 @@ def user_extracted_features(dataType, fftTop, users, n):
     fullMatrix.reset_index()
     return fullMatrix
     
-def get_metrics(y_test, y_pred):
+def get_metrics(user, y_test, y_pred):
     table = []
+    table.append(user)
     table.append(metrics.accuracy_score(y_test, y_pred))
     table.append(metrics.precision_score(y_test, y_pred))
     table.append(metrics.recall_score(y_test, y_pred))
     table.append(metrics.f1_score(y_test, y_pred))
     return table 
 
-def get_tree_metrics(X_train, X_test, y_train, y_test):    
+def get_tree_metrics(data, user):
+    if user != 'allusers':
+        userData = data.groupby('user').get_group(user)
+    else:
+        userData = data
+    userData = userData.drop('user', axis = 1)
+    X = userData.drop('label', axis = 1)
+    y = userData['label']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=42)
+    
+    
+    scaler = StandardScaler()
+    # Fit on training set only.
+    scaler.fit(X_train)
+    # Apply transform to both the training set and the test set.
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
+    
+    pca = PCA(.95)
+    pca.fit(X_train)
+    X_train = pca.transform(X_train)
+    X_test = pca.transform(X_test) 
+    
     clf = tree.DecisionTreeClassifier()
     clf = clf.fit(X_train, y_train)
+    
     y_pred = clf.predict(X_test)
-    return get_metrics(y_test, y_pred)
 
-def get_svm_metrics(X_train, X_test, y_train, y_test):
+    return get_metrics(user, y_test, y_pred)
+
+def get_svm_metrics(data, user):
+    if user != 'allusers':
+        userData = data.groupby('user').get_group(user)
+    else:
+        userData = data
+    userData = userData.drop('user', axis = 1)
+    X = userData.drop('label', axis = 1)
+    y = userData['label']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=42)
+    
+    
+    scaler = StandardScaler()
+    # Fit on training set only.
+    scaler.fit(X_train)
+    # Apply transform to both the training set and the test set.
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
+    
+    pca = PCA(.95)
+    pca.fit(X_train)
+    X_train = pca.transform(X_train)
+    X_test = pca.transform(X_test) 
+    
     svclassifier = SVC(kernel='poly', degree=3)
     svclassifier.fit(X_train, y_train)
     y_pred = svclassifier.predict(X_test)
-    return get_metrics(y_test, y_pred)
+    return get_metrics(user, y_test, y_pred)
 
-def get_NN_metrics(X_train, X_test, y_train, y_test):
+def get_NN_metrics(data, user):
+    if user != 'allusers':
+        userData = data.groupby('user').get_group(user)
+    else:
+        userData = data
+    userData = userData.drop('user', axis = 1)
+    X = userData.drop('label', axis = 1)
+    y = userData['label']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=42)
+    
+    
+    scaler = StandardScaler()
+    # Fit on training set only.
+    scaler.fit(X_train)
+    # Apply transform to both the training set and the test set.
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
+    
+    pca = PCA(.95)
+    pca.fit(X_train)
+    X_train = pca.transform(X_train)
+    X_test = pca.transform(X_test) 
+    
+    
+
     clf = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(15, 5), random_state=1, max_iter = 2000)
+    
     clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
-    return get_metrics(y_test, y_pred)
-    
-    
+    return get_metrics(user, y_test, y_pred)
 ########################################    Main    #########################################
 
 GroundTruthUsers = listdir("groundTruth")
@@ -206,98 +276,54 @@ else:
     wholeEMGMatrix.to_csv("EMGFeature.csv")
 
 
+inputData = wholeIMUMatrix
 
-#wholeIMUMAtrix = wholeIMUMatrix.drop(index = [1212,2238,2239,2240])
-wholeMatrix = wholeEMGMatrix
-
-##########################   Phase 1 for each user ################################
-inputData = wholeMatrix.groupby('user').get_group('user9')
-inputData = inputData.drop('user', axis = 1)
-X = inputData.drop('label', axis = 1)
-y = inputData['label']
-phase1X_train, phase1X_test, phase1Y_train, phase1Y_test = train_test_split(X, y, test_size=0.4, random_state=42)
+#########################   do decision tree   ################################
+decisionTreeMetricsTable = [] 
+decisionTreeMetricsTable.append(get_tree_metrics(inputData, 'user9'))
 for user in intersection:
-    inputData = wholeMatrix.groupby('user').get_group(user)
-    inputData = inputData.drop('user', axis = 1)
-    X = inputData.drop('label', axis = 1)
-    y = inputData['label']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=42)
-    phase1X_train = phase1X_train.append(X_train)
-    phase1Y_train = phase1Y_train.append(y_train)
-    phase1X_test = phase1X_test.append(X_test)
-    phase1Y_test = phase1Y_test.append(y_test)
-scaler = StandardScaler()
-# Fit on training set only.
-scaler.fit(phase1X_train)
-# Apply transform to both the training set and the test set.
-phase1X_train = scaler.transform(phase1X_train)
-phase1X_test = scaler.transform(phase1X_test)
-#do pca
-pca = PCA(.95)
-pca.fit(phase1X_train)
-X_train = pca.transform(phase1X_train)
-X_test = pca.transform(phase1X_test) 
-phase1MetricsTable = []
-phase1MetricsTable.append(get_tree_metrics(phase1X_train, phase1X_test, phase1Y_train, phase1Y_test))
-phase1MetricsTable.append(get_svm_metrics(phase1X_train, phase1X_test, phase1Y_train, phase1Y_test))
-phase1MetricsTable.append(get_NN_metrics(phase1X_train, phase1X_test, phase1Y_train, phase1Y_test))
-phase1MetricsTable = pd.DataFrame(data = phase1MetricsTable, columns= ['accuracy', 'precision', 'recall', 'f1'])
-phase1MetricsTable['method'] = ['Decision Tree', 'Support Vector Machine', 'Neural Network']
+    decisionTreeMetricsTable.append(get_tree_metrics(inputData, user))
+decisionTreeMetricsTable = pd.DataFrame(data = decisionTreeMetricsTable, columns= ['user', 'accuracy', 'precision', 'recall', 'f1'])
+
+#########################   do SVM  ################################
+
+
+SVMMetricsTable = [] 
+SVMMetricsTable.append(get_svm_metrics(inputData, 'user9'))
+for user in intersection:
+    SVMMetricsTable.append(get_svm_metrics(inputData, user))
+SVMMetricsTable = pd.DataFrame(data = SVMMetricsTable, columns= ['user', 'accuracy', 'precision', 'recall', 'f1'])
+
+########################## do neural network  ######################################
+
+NNMetricsTable = [] 
+NNMetricsTable.append(get_NN_metrics(inputData, 'user9'))
+for user in intersection:
+    NNMetricsTable.append(get_NN_metrics(inputData, user))
+NNMetricsTable = pd.DataFrame(data = NNMetricsTable, columns= ['user', 'accuracy', 'precision', 'recall', 'f1'])
 
 
 ################ phase 2 on all data #############################################
-inputData = wholeMatrix
-inputData = inputData.drop('user', axis = 1)
-X = inputData.drop('label', axis = 1)
-y = inputData['label']
-# split data
-Phase2X_train, Phase2X_test, Phase2Y_train, Phase2Y_test = train_test_split(X, y, test_size=0.4, random_state=42)
-#  normalize data
-scaler = StandardScaler()
-# Fit on training set only.
-scaler.fit(Phase2X_train)
-# Apply transform to both the training set and the test set.
-Phase2X_train = scaler.transform(Phase2X_train)
-Phase2X_test = scaler.transform(Phase2X_test)
-#do pca
-pca = PCA(.95)
-pca.fit(Phase2X_train)
-X_train = pca.transform(Phase2X_train)
-X_test = pca.transform(Phase2X_test) 
 
-phase2MetricsTable = []
-phase2MetricsTable.append(get_tree_metrics(Phase2X_train, Phase2X_test, Phase2Y_train, Phase2Y_test))
-phase2MetricsTable.append(get_svm_metrics(Phase2X_train, Phase2X_test, Phase2Y_train, Phase2Y_test))
-phase2MetricsTable.append(get_NN_metrics(Phase2X_train, Phase2X_test, Phase2Y_train, Phase2Y_test))
-phase2MetricsTable = pd.DataFrame(data = phase2MetricsTable, columns= ['accuracy', 'precision', 'recall', 'f1'])
-phase2MetricsTable['method'] = ['Decision Tree', 'Support Vector Machine', 'Neural Network']
+allUsersMetricsTable = []
+allUsersMetricsTable.append(get_tree_metrics(inputData, 'allusers'))
+allUsersMetricsTable.append(get_svm_metrics(inputData, 'allusers'))
+allUsersMetricsTable.append(get_NN_metrics(inputData, 'allusers'))
+allUsersMetricsTable = pd.DataFrame(data = allUsersMetricsTable, columns= ['method', 'accuracy', 'precision', 'recall', 'f1'])
+allUsersMetricsTable['method'] = ['Decision Tree', 'Support Vector Machine', 'Neural Network']
 
 
+test1 = user_extracted_features('IMU', fftTop, ['user18', 'user25'], 100)
+test2 = user_extracted_features('EMG', fftTop, ['user18', 'user25'], 100)
+
+test1['label'].count
+users1 = wholeIMUMatrix.groupby('user')['label'].agg('count')
+
+users2 = wholeEMGMatrix.groupby('user')['label'].agg('count')
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-# test1 = user_extracted_features('IMU', fftTop, ['user18', 'user25'], 100)
-# test2 = user_extracted_features('EMG', fftTop, ['user18', 'user25'], 100)
-
-# test1['label'].count
-# users1 = wholeIMUMatrix.groupby('user')['label'].agg('count')
-
-# users2 = wholeEMGMatrix.groupby('user')['label'].agg('count')
-
-
-
+# user18IMU = wholeIMUMatrix.groupby('user').get_group('user18')
+# user18EMG =wholeEMGMatrix.groupby('user').get_group('user18')
 
 
 
