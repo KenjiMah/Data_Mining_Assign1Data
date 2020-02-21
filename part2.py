@@ -23,11 +23,17 @@ import random
 def LabelData(groundTruth, data):
     #label the eating and non eating segments of data using the ground truth information
     data['label'] = 0
+    count = 0
     for index, row in groundTruth.iterrows():
+        if abs(row[1]) > len(data) or abs(row[0]) > len(data):
+            
+            count +=1
+            
         if (row[1]- row[0] < 0): 
             continue
         else:
             data[int(row[0]) : int(row[1] + 1)]['label'] = 1
+    print('insufficuent data this occured : ', count, 'times')
     return data
 
 def GetLabeledDataMatrix(folder, userFolder1, userFolder2, utensil, dataType):
@@ -175,6 +181,8 @@ def get_NN_metrics(X_train, X_test, y_train, y_test):
     
 ########################################    Main    #########################################
 
+
+
 GroundTruthUsers = listdir("groundTruth")
 MyoDataUsers = listdir("MyoData")
 
@@ -217,6 +225,12 @@ for i in range(len(wholeEMGMatrix)):
         print('there is a missaligned input')
         
         
+        
+        
+# print("EMG time")
+# user_extracted_features('EMG', fftTop, ['user25'], 100)
+# print("IMU time")
+# user_extracted_features('IMU', fftTop, ['user25'], 100)      
 wholeMatrix = pd.concat([wholeIMUMatrix.drop(columns = ['label','user']), wholeEMGMatrix], axis = 1)
 
 ##########################   Phase 1 for each user ################################
