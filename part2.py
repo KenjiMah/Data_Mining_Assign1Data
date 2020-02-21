@@ -18,6 +18,7 @@ from sklearn import tree
 from sklearn import metrics
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
+import random
 
 def LabelData(groundTruth, data):
     #label the eating and non eating segments of data using the ground truth information
@@ -152,9 +153,11 @@ def get_metrics(y_test, y_pred):
     return table 
 
 def get_tree_metrics(X_train, X_test, y_train, y_test):    
-    clf = tree.DecisionTreeClassifier()
+    clf = tree.DecisionTreeClassifier(max_depth = 2)
     clf = clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
+    plt.figure(figsize = (100,100))
+    tree.plot_tree(clf.fit(X_train, y_train)) 
     return get_metrics(y_test, y_pred)
 
 def get_svm_metrics(X_train, X_test, y_train, y_test):
@@ -204,11 +207,17 @@ else:
     wholeEMGMatrix = user_extracted_features('EMG', fftTop, intersection, 200)
     print("--- %s seconds ---" % (time.time() - start_time))
     wholeEMGMatrix.to_csv("EMGFeature.csv")
-
-
-
-#wholeIMUMAtrix = wholeIMUMatrix.drop(index = [1212,2238,2239,2240])
-wholeMatrix = wholeEMGMatrix
+######### drop the 4 values because of missing IMU data ######################
+wholeEMGMatrix = wholeEMGMatrix.drop(index = [1212,1213,1214])
+wholeEMGMatrix = wholeEMGMatrix.reset_index(drop=True)
+wholeEMGMatrix = wholeEMGMatrix.drop(index = [2238])
+wholeEMGMatrix = wholeEMGMatrix.reset_index(drop=True)
+for i in range(len(wholeEMGMatrix)):
+    if wholeEMGMatrix.loc[i]['label'] != wholeIMUMatrix.loc[i]['label']:
+        print('there is a missaligned input')
+        
+        
+wholeMatrix = pd.concat([wholeIMUMatrix.drop(columns = ['label','user']), wholeEMGMatrix], axis = 1)
 
 ##########################   Phase 1 for each user ################################
 inputData = wholeMatrix.groupby('user').get_group('user9')
@@ -237,6 +246,7 @@ pca = PCA(.95)
 pca.fit(phase1X_train)
 X_train = pca.transform(phase1X_train)
 X_test = pca.transform(phase1X_test) 
+
 phase1MetricsTable = []
 phase1MetricsTable.append(get_tree_metrics(phase1X_train, phase1X_test, phase1Y_train, phase1Y_test))
 phase1MetricsTable.append(get_svm_metrics(phase1X_train, phase1X_test, phase1Y_train, phase1Y_test))
@@ -244,31 +254,43 @@ phase1MetricsTable.append(get_NN_metrics(phase1X_train, phase1X_test, phase1Y_tr
 phase1MetricsTable = pd.DataFrame(data = phase1MetricsTable, columns= ['accuracy', 'precision', 'recall', 'f1'])
 phase1MetricsTable['method'] = ['Decision Tree', 'Support Vector Machine', 'Neural Network']
 
-
-################ phase 2 on all data #############################################
+##########################   Phase 2 ################################
+allUsers = intersection.copy()
+allUsers.insert(0,'user9')
+random.Random(42).shuffle(allUsers)
+# split all users 60%, 40%
+usersTrain = allUsers[:int(.6 * len(allUsers))].copy()
+usersTest = allUsers[int(.6 * len(allUsers)):].copy()
 inputData = wholeMatrix
-inputData = inputData.drop('user', axis = 1)
-X = inputData.drop('label', axis = 1)
-y = inputData['label']
-# split data
-Phase2X_train, Phase2X_test, Phase2Y_train, Phase2Y_test = train_test_split(X, y, test_size=0.4, random_state=42)
+phase2X_train = pd.DataFrame()
+phase2X_test = pd.DataFrame()
+test = wholeMatrix.groupby('user').get_group(user).loc[:, 'label']
+for user in usersTrain:
+    phase2X_train = phase2X_train.append(wholeMatrix.groupby('user').get_group(user).drop(['user'], axis = 1))
+phase2Y_train = phase2X_train['label']
+phase2X_train = phase2X_train.drop('label', axis = 1)
+for user in usersTest:
+    phase2X_test = phase2X_test.append(wholeMatrix.groupby('user').get_group(user).drop(['user'], axis = 1))
+phase2Y_test = phase2X_test['label']
+phase2X_test = phase2X_test.drop('label', axis = 1)
+
 #  normalize data
 scaler = StandardScaler()
 # Fit on training set only.
-scaler.fit(Phase2X_train)
+scaler.fit(phase2X_train)
 # Apply transform to both the training set and the test set.
-Phase2X_train = scaler.transform(Phase2X_train)
-Phase2X_test = scaler.transform(Phase2X_test)
+phase2X_train = scaler.transform(phase2X_train)
+phase2X_test = scaler.transform(phase2X_test)
 #do pca
 pca = PCA(.95)
-pca.fit(Phase2X_train)
-X_train = pca.transform(Phase2X_train)
-X_test = pca.transform(Phase2X_test) 
+pca.fit(phase2X_train)
+X_train = pca.transform(phase2X_train)
+X_test = pca.transform(phase2X_test) 
 
 phase2MetricsTable = []
-phase2MetricsTable.append(get_tree_metrics(Phase2X_train, Phase2X_test, Phase2Y_train, Phase2Y_test))
-phase2MetricsTable.append(get_svm_metrics(Phase2X_train, Phase2X_test, Phase2Y_train, Phase2Y_test))
-phase2MetricsTable.append(get_NN_metrics(Phase2X_train, Phase2X_test, Phase2Y_train, Phase2Y_test))
+phase2MetricsTable.append(get_tree_metrics(phase2X_train, phase2X_test, phase2Y_train, phase2Y_test))
+phase2MetricsTable.append(get_svm_metrics(phase2X_train, phase2X_test, phase2Y_train, phase2Y_test))
+phase2MetricsTable.append(get_NN_metrics(phase2X_train, phase2X_test, phase2Y_train, phase2Y_test))
 phase2MetricsTable = pd.DataFrame(data = phase2MetricsTable, columns= ['accuracy', 'precision', 'recall', 'f1'])
 phase2MetricsTable['method'] = ['Decision Tree', 'Support Vector Machine', 'Neural Network']
 
@@ -277,6 +299,32 @@ phase2MetricsTable['method'] = ['Decision Tree', 'Support Vector Machine', 'Neur
 
 
 
+# ################ incorrect phase 2 on all data (keep just in case) #############################################
+# inputData = wholeMatrix
+# inputData = inputData.drop('user', axis = 1)
+# X = inputData.drop('label', axis = 1)
+# y = inputData['label']
+# # split data
+# phase2X_train, phase2X_test, phase2Y_train, phase2Y_test = train_test_split(X, y, test_size=0.4, random_state=42)
+# #  normalize data
+# scaler = StandardScaler()
+# # Fit on training set only.
+# scaler.fit(phase2X_train)
+# # Apply transform to both the training set and the test set.
+# phase2X_train = scaler.transform(phase2X_train)
+# phase2X_test = scaler.transform(phase2X_test)
+# #do pca
+# pca = PCA(.95)
+# pca.fit(phase2X_train)
+# X_train = pca.transform(phase2X_train)
+# X_test = pca.transform(phase2X_test) 
+
+# phase2MetricsTable = []
+# phase2MetricsTable.append(get_tree_metrics(phase2X_train, phase2X_test, phase2Y_train, phase2Y_test))
+# phase2MetricsTable.append(get_svm_metrics(phase2X_train, phase2X_test, phase2Y_train, phase2Y_test))
+# phase2MetricsTable.append(get_NN_metrics(phase2X_train, phase2X_test, phase2Y_train, phase2Y_test))
+# phase2MetricsTable = pd.DataFrame(data = phase2MetricsTable, columns= ['accuracy', 'precision', 'recall', 'f1'])
+# phase2MetricsTable['method'] = ['Decision Tree', 'Support Vector Machine', 'Neural Network']
 
 
 
@@ -284,17 +332,6 @@ phase2MetricsTable['method'] = ['Decision Tree', 'Support Vector Machine', 'Neur
 
 
 
-
-
-
-
-# test1 = user_extracted_features('IMU', fftTop, ['user18', 'user25'], 100)
-# test2 = user_extracted_features('EMG', fftTop, ['user18', 'user25'], 100)
-
-# test1['label'].count
-# users1 = wholeIMUMatrix.groupby('user')['label'].agg('count')
-
-# users2 = wholeEMGMatrix.groupby('user')['label'].agg('count')
 
 
 
