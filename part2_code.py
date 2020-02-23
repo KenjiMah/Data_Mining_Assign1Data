@@ -167,7 +167,7 @@ def get_tree_metrics(X_train, X_test, y_train, y_test):
     return get_metrics(y_test, y_pred)
 
 def get_svm_metrics(X_train, X_test, y_train, y_test):
-    svclassifier = SVC(kernel='poly', degree=3)
+    svclassifier = SVC(kernel='linear')
     svclassifier.fit(X_train, y_train)
     y_pred = svclassifier.predict(X_test)
     return get_metrics(y_test, y_pred)
