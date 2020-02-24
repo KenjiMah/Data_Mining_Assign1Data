@@ -19,6 +19,7 @@ from sklearn import metrics
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 import random
+from sklearn.utils import resample
 
 def LabelData(groundTruth, data):
     #label the eating and non eating segments of data using the ground truth information
@@ -33,7 +34,7 @@ def LabelData(groundTruth, data):
             continue
         else:
             data[int(row[0]) : int(row[1] + 1)]['label'] = 1
-    print('insufficuent data this occured : ', count, 'times')
+    print('num of insufficient data occurances: ', count, 'times')
     return data
 
 def GetLabeledDataMatrix(folder, userFolder1, userFolder2, utensil, dataType):
@@ -117,11 +118,12 @@ def feature_extraction(data, n):
     sample = pd.DataFrame(columns = data.columns)
     j = 0
     for i in range(len(data)):
-        if data.loc[i]['label'] == lastLabel or i == len(data) - 1:
+        if data.loc[i]['label'] == lastLabel and i != len(data) and j <= n:
             sample.loc[j] = data.loc[i]
             j += 1
         else:
-            PCAInput1 = PCAInput1.append(sample_feature_extraction(sample, fftTop, n))
+            if j > (n/10):
+                PCAInput1 = PCAInput1.append(sample_feature_extraction(sample, fftTop, n))
             sample = pd.DataFrame(columns = data.columns)
             sample.loc[0] = data.loc[i]
             lastLabel = data.loc[i]['label']
@@ -129,21 +131,31 @@ def feature_extraction(data, n):
     return PCAInput1
 
 def user_extracted_features(dataType, fftTop, users, n):
+    global fork
+    global spoon
     fullMatrix = pd.DataFrame()
+    print('fork data has ', end =" ")
     fork = pd.DataFrame(GetLabeledDataMatrix('groundTruth', 'user9', 'user09', 'fork', dataType))
+    print('spoon data has ', end =" ")
     spoon = GetLabeledDataMatrix('groundTruth', 'user9', 'user09', 'spoon', dataType)
     fork = feature_extraction(fork, n)
+    print('fork length of data: ', len(fork))
     spoon = feature_extraction(spoon, n)
+    print('spoon length of data: ', len(spoon))
     userDataMatrix = pd.DataFrame()
     userDataMatrix = fork.append(spoon, ignore_index =True)
     userDataMatrix['user'] = 'user9'
     fullMatrix = fullMatrix.append(userDataMatrix, ignore_index =True)
     for user in users:
         print(user)
+        print('fork data has ', end =" ")
         fork = GetLabeledDataMatrix('groundTruth', user, user, 'fork', dataType)
+        print('spoon data has ', end =" ")
         spoon = GetLabeledDataMatrix('groundTruth', user, user, 'spoon', dataType)
         fork = feature_extraction(fork, n)
+        print('fork length of data: ', len(fork))
         spoon = feature_extraction(spoon, n)
+        print('spoon length of data: ', len(spoon))
         userDataMatrix = fork.append(spoon, ignore_index =True)
         userDataMatrix['user'] = user
         fullMatrix = fullMatrix.append(userDataMatrix, ignore_index =True)
@@ -159,11 +171,11 @@ def get_metrics(y_test, y_pred):
     return table 
 
 def get_tree_metrics(X_train, X_test, y_train, y_test):    
-    clf = tree.DecisionTreeClassifier(max_depth = 2)
+    clf = tree.DecisionTreeClassifier(max_depth = 4)
     clf = clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
-    plt.figure(figsize = (100,100))
-    tree.plot_tree(clf.fit(X_train, y_train)) 
+    # plt.figure(figsize = (100,100))
+    # tree.plot_tree(clf.fit(X_train, y_train)) 
     return get_metrics(y_test, y_pred)
 
 def get_svm_metrics(X_train, X_test, y_train, y_test):
@@ -173,12 +185,17 @@ def get_svm_metrics(X_train, X_test, y_train, y_test):
     return get_metrics(y_test, y_pred)
 
 def get_NN_metrics(X_train, X_test, y_train, y_test):
-    clf = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(15, 5), random_state=1, max_iter = 2000)
+    clf = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(38, 30), random_state=1, max_iter = 20000)
     clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
     return get_metrics(y_test, y_pred)
     
-    
+def downsample(df):
+    df_majority = df[df['label']==0]
+    df_minority = df[df['label']==1]
+    df_majority_downsampled = resample(df_majority, replace=False, n_samples=len(df_minority), random_state=123)
+    df_downsampled = pd.concat([df_majority_downsampled, df_minority], ignore_index =True)
+    return df_downsampled
 ########################################    Main    #########################################
 
 
@@ -188,8 +205,6 @@ MyoDataUsers = listdir("MyoData")
 
 A = set(GroundTruthUsers)
 B = set(MyoDataUsers) 
-print (A.difference(B)) 
-print (B.difference(A)) 
 
 intersection = list(A.intersection(B))
 intersection.sort()
@@ -216,31 +231,33 @@ else:
     print("--- %s seconds ---" % (time.time() - start_time))
     wholeEMGMatrix.to_csv("EMGFeature.csv")
 ######### drop the 4 values because of missing IMU data ######################
-wholeEMGMatrix = wholeEMGMatrix.drop(index = [1212,1213,1214])
-wholeEMGMatrix = wholeEMGMatrix.reset_index(drop=True)
-wholeEMGMatrix = wholeEMGMatrix.drop(index = [2238])
-wholeEMGMatrix = wholeEMGMatrix.reset_index(drop=True)
-for i in range(len(wholeEMGMatrix)):
-    if wholeEMGMatrix.loc[i]['label'] != wholeIMUMatrix.loc[i]['label']:
-        print('there is a missaligned input')
+# wholeEMGMatrix = wholeEMGMatrix.drop(index = [1212,1213,1214])
+# wholeEMGMatrix = wholeEMGMatrix.reset_index(drop=True)
+# wholeEMGMatrix = wholeEMGMatrix.drop(index = [2238])
+# wholeEMGMatrix = wholeEMGMatrix.reset_index(drop=True)
+# for i in range(len(wholeEMGMatrix)):
+#     if wholeEMGMatrix.loc[i]['label'] != wholeIMUMatrix.loc[i]['label']:
+#         print('there is a missaligned input')
         
         
-        
-# countLabels = np.unique(wholeMatrix['label'].values, return_counts=True)
+# np.count_nonzero(np.isnan(phase1X_train))
+# np.count_nonzero(np.isnan(phase1X_test)) 
 # print("EMG time")
 # user_extracted_features('EMG', fftTop, ['user25'], 100)
 # print("IMU time")
 # user_extracted_features('IMU', fftTop, ['user25'], 100)      
-wholeMatrix = pd.concat([wholeIMUMatrix.drop(columns = ['label','user']), wholeEMGMatrix], axis = 1)
-
+# wholeMatrix = pd.concat([wholeIMUMatrix.drop(columns = ['label','user']), wholeEMGMatrix], axis = 1)
+wholeMatrix = wholeIMUMatrix
 ##########################   Phase 1 for each user ################################
 inputData = wholeMatrix.groupby('user').get_group('user9')
+inputData = downsample(inputData)
 inputData = inputData.drop('user', axis = 1)
 X = inputData.drop('label', axis = 1)
 y = inputData['label']
 phase1X_train, phase1X_test, phase1Y_train, phase1Y_test = train_test_split(X, y, test_size=0.4, random_state=42)
 for user in intersection:
     inputData = wholeMatrix.groupby('user').get_group(user)
+    inputData = downsample(inputData)
     inputData = inputData.drop('user', axis = 1)
     X = inputData.drop('label', axis = 1)
     y = inputData['label']
@@ -257,9 +274,10 @@ phase1X_train = scaler.transform(phase1X_train)
 phase1X_test = scaler.transform(phase1X_test)
 #do pca
 pca = PCA(.95)
+
 pca.fit(phase1X_train)
-X_train = pca.transform(phase1X_train)
-X_test = pca.transform(phase1X_test) 
+phase1X_train = pca.transform(phase1X_train)
+phase1X_test = pca.transform(phase1X_test) 
 
 phase1MetricsTable = []
 phase1MetricsTable.append(get_tree_metrics(phase1X_train, phase1X_test, phase1Y_train, phase1Y_test))
@@ -276,15 +294,15 @@ random.Random(42).shuffle(allUsers)
 usersTrain = allUsers[:int(.6 * len(allUsers))].copy()
 usersTest = allUsers[int(.6 * len(allUsers)):].copy()
 inputData = wholeMatrix
+inputData = downsample(inputData)
 phase2X_train = pd.DataFrame()
 phase2X_test = pd.DataFrame()
-test = wholeMatrix.groupby('user').get_group(user).loc[:, 'label']
 for user in usersTrain:
-    phase2X_train = phase2X_train.append(wholeMatrix.groupby('user').get_group(user).drop(['user'], axis = 1))
+    phase2X_train = phase2X_train.append(downsample(wholeMatrix.groupby('user').get_group(user)).drop(['user'], axis = 1))
 phase2Y_train = phase2X_train['label']
 phase2X_train = phase2X_train.drop('label', axis = 1)
 for user in usersTest:
-    phase2X_test = phase2X_test.append(wholeMatrix.groupby('user').get_group(user).drop(['user'], axis = 1))
+    phase2X_test = phase2X_test.append(downsample(wholeMatrix.groupby('user').get_group(user)).drop(['user'], axis = 1))
 phase2Y_test = phase2X_test['label']
 phase2X_test = phase2X_test.drop('label', axis = 1)
 
@@ -298,8 +316,8 @@ phase2X_test = scaler.transform(phase2X_test)
 #do pca
 pca = PCA(.95)
 pca.fit(phase2X_train)
-X_train = pca.transform(phase2X_train)
-X_test = pca.transform(phase2X_test) 
+phase2X_train = pca.transform(phase2X_train)
+phase2X_test = pca.transform(phase2X_test) 
 
 phase2MetricsTable = []
 phase2MetricsTable.append(get_tree_metrics(phase2X_train, phase2X_test, phase2Y_train, phase2Y_test))
