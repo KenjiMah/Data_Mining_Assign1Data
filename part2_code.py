@@ -226,7 +226,7 @@ for i in range(len(wholeEMGMatrix)):
         
         
         
-        
+# countLabels = np.unique(wholeMatrix['label'].values, return_counts=True)
 # print("EMG time")
 # user_extracted_features('EMG', fftTop, ['user25'], 100)
 # print("IMU time")
